@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -30,7 +31,7 @@ namespace OdeToFood
             {
                 options.UseSqlServer(Configuration.GetConnectionString("OdeToFoodDb"));
             });
-            // whenever restaurant data is requested, a single instance of inmemoryrestodata will be provided
+            // whenever restaurant data is requested, a db context instance will be read using interface
             services.AddScoped<IRestauarantData, SqlRestaurantData>();
         }
 
@@ -48,6 +49,9 @@ namespace OdeToFood
                 app.UseHsts();
             }
 
+            //basic health check
+            app.Use(SayHello);
+
             app.UseHttpsRedirection();
             app.UseStaticFiles();
 
@@ -59,6 +63,34 @@ namespace OdeToFood
             {
                 endpoints.MapRazorPages();
             });
+            // only invoked if everything else fails
+            app.Use(LastResortMiddleware);
+        }
+
+        private RequestDelegate SayHello(RequestDelegate next)
+        {
+            
+            return async ctx =>
+            {
+                if (ctx.Request.Path.StartsWithSegments("/hello"))
+                {
+                    ctx.Response.StatusCode = 200;
+                    await ctx.Response.WriteAsync("hello");
+                }
+                else 
+                {
+                    // continues the pipeline by moving to the next middleware
+                    await next(ctx);
+                }
+            };
+        }
+
+        private RequestDelegate LastResortMiddleware(RequestDelegate arg)
+        {
+            return async ctx =>
+            {
+                await ctx.Response.WriteAsync("hehe you are curious, I like that");
+            };
         }
     }
 }
